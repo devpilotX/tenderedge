@@ -1,0 +1,58 @@
+{
+  "name": "tenderedge",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TenderEdge — Industrial Tender & Contract Platform (multi-tenant B2B SaaS)",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js",
+    "lint": "eslint . --ext .ts",
+    "lint:fix": "eslint . --ext .ts --fix",
+    "format": "prettier --write \"**/*.{ts,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,json,md}\"",
+    "migrate": "tsx src/db/migrate.ts up",
+    "migrate:down": "tsx src/db/migrate.ts down",
+    "migrate:status": "tsx src/db/migrate.ts status",
+    "db:setup": "tsx src/db/setup.ts",
+    "seed": "tsx src/db/seed.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit": "vitest run test/unit",
+    "test:property": "vitest run test/property",
+    "test:integration": "vitest run test/integration",
+    "test:load": "tsx test/load/run-load.ts"
+  },
+  "dependencies": {
+    "@node-rs/argon2": "^2.0.2",
+    "bullmq": "^5.34.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "ioredis": "^5.4.2",
+    "pg": "^8.13.1",
+    "pino": "^9.5.0",
+    "pino-http": "^10.3.0",
+    "ws": "^8.18.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.5",
+    "@types/pg": "^8.11.10",
+    "@types/ws": "^8.5.13",
+    "@typescript-eslint/eslint-plugin": "^8.19.1",
+    "@typescript-eslint/parser": "^8.19.1",
+    "eslint": "^8.57.1",
+    "eslint-config-prettier": "^9.1.0",
+    "fast-check": "^3.23.2",
+    "prettier": "^3.4.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}
