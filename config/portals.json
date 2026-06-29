@@ -1,0 +1,36 @@
+{
+  "portals": [
+    {
+      "name": "Bihar State eProcurement",
+      "baseUrl": "https://eproc.bihar.example.gov.in",
+      "rateLimitRpm": 30,
+      "publicFlag": true,
+      "accessPolicyPath": "/robots.txt",
+      "pollIntervalMinutes": 15
+    },
+    {
+      "name": "PHED Bihar Tenders",
+      "baseUrl": "https://phed.bihar.example.gov.in",
+      "rateLimitRpm": 20,
+      "publicFlag": true,
+      "accessPolicyPath": "/robots.txt",
+      "pollIntervalMinutes": 15
+    },
+    {
+      "name": "Municipal Corporation Procurement",
+      "baseUrl": "https://nagarseva.example.gov.in",
+      "rateLimitRpm": 0,
+      "publicFlag": true,
+      "accessPolicyPath": "/robots.txt",
+      "pollIntervalMinutes": 30
+    },
+    {
+      "name": "Private Industrial Tenders Feed",
+      "baseUrl": "https://feed.industrialtenders.example.com",
+      "rateLimitRpm": 60,
+      "publicFlag": true,
+      "accessPolicyPath": "/robots.txt",
+      "pollIntervalMinutes": 10
+    }
+  ]
+}
