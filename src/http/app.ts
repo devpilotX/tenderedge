@@ -3,6 +3,8 @@ import pinoHttp from 'pino-http';
 import { logger } from '../core/logger.js';
 import { checkHealth } from '../core/health.js';
 import { isAppError } from '../core/errors.js';
+import './types.js';
+import { authRouter } from './routes/auth.js';
 
 /**
  * Builds the Express application. Route modules for each service are mounted
@@ -38,6 +40,6 @@ export function createApp(): Application {
  * Mounts feature routers. Each service registers itself here as it is built so
  * the wiring stays in one place. Kept side-effect-free aside from app.use.
  */
-function mountRouters(_app: Application): void {
-  // Service routers are mounted here as they are implemented in subsequent tasks.
+function mountRouters(app: Application): void {
+  app.use('/auth', authRouter());
 }
