@@ -6,6 +6,7 @@ import { isAppError } from '../core/errors.js';
 import './types.js';
 import { authRouter } from './routes/auth.js';
 import { matchRouter } from './routes/match.js';
+import { bidBrainRouter } from './routes/bidbrain.js';
 
 /**
  * Builds the Express application. Route modules for each service are mounted
@@ -44,4 +45,5 @@ export function createApp(): Application {
 function mountRouters(app: Application): void {
   app.use('/auth', authRouter());
   app.use('/match', matchRouter());
+  app.use('/bidbrain', bidBrainRouter());
 }
