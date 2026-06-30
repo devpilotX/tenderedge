@@ -4,12 +4,16 @@ import { env } from './config/env.js';
 import { logger } from './core/logger.js';
 import { getQueue } from './queue/index.js';
 import { closePool } from './db/pool.js';
+import { registerRadarJobs } from './radar/scheduler.js';
 
 async function main(): Promise<void> {
   const app = createApp();
   const queue = getQueue();
   await queue.start();
   logger.info({ driver: queue.driver }, 'job queue started');
+
+  // Tender Radar: schedule polling for every configured portal (auto-recovers on restart).
+  await registerRadarJobs(queue);
 
   const server: Server = app.listen(env.PORT, () => {
     logger.info({ port: env.PORT, env: env.NODE_ENV }, 'TenderEdge API listening');
