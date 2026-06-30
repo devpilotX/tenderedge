@@ -9,6 +9,7 @@ import { evaluateTender, pruneExpiredMatches } from './match/service.js';
 import { scanReminders, scanGraceClosures } from './deadline/service.js';
 import { scanExpiringDocuments } from './documents/service.js';
 import { processPendingNotifications } from './notifications/delivery.js';
+import { runDueBillingCycles } from './billing/service.js';
 import { closeExpiredTenders } from './db/repositories/tenders.js';
 
 async function main(): Promise<void> {
@@ -58,6 +59,17 @@ async function main(): Promise<void> {
     'notification.dispatch',
     {},
     { everyMs: 60_000, jobId: 'notification:dispatch' },
+  );
+
+  // Subscription billing: charge due subscriptions, retry, and restrict on non-payment (REQ 13).
+  queue.register('billing.cycle', async () => {
+    const processed = await runDueBillingCycles();
+    if (processed > 0) logger.info({ processed }, 'billing cycles processed');
+  });
+  await queue.scheduleRepeating(
+    'billing.cycle',
+    {},
+    { everyMs: 24 * 60 * 60_000, jobId: 'billing:cycle' },
   );
 
   const server: Server = app.listen(env.PORT, () => {
