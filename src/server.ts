@@ -6,6 +6,7 @@ import { getQueue } from './queue/index.js';
 import { closePool, withSystem } from './db/pool.js';
 import { registerRadarJobs } from './radar/scheduler.js';
 import { evaluateTender, pruneExpiredMatches } from './match/service.js';
+import { scanReminders, scanGraceClosures } from './deadline/service.js';
 import { closeExpiredTenders } from './db/repositories/tenders.js';
 
 async function main(): Promise<void> {
@@ -32,6 +33,17 @@ async function main(): Promise<void> {
     'match.maintenance',
     {},
     { everyMs: 15 * 60_000, jobId: 'match:maintenance' },
+  );
+
+  // Deadline Guard: fire due reminders and close pursued tenders past grace (REQ 8).
+  queue.register('deadline.scan', async () => {
+    await scanReminders();
+    await scanGraceClosures();
+  });
+  await queue.scheduleRepeating(
+    'deadline.scan',
+    {},
+    { everyMs: 5 * 60_000, jobId: 'deadline:scan' },
   );
 
   const server: Server = app.listen(env.PORT, () => {
