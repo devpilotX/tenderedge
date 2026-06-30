@@ -66,3 +66,29 @@ export async function listNotificationsForAccount(
   );
   return rows;
 }
+
+/** Enables/disables a channel for an account (REQ 12.4), upserted per (account, channel). */
+export async function upsertNotificationPref(
+  client: PoolClient,
+  businessAccountId: string,
+  channel: NotificationChannel,
+  enabled: boolean,
+): Promise<void> {
+  await client.query(
+    `INSERT INTO notification_pref (business_account_id, channel, enabled)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (business_account_id, channel) DO UPDATE SET enabled = EXCLUDED.enabled`,
+    [businessAccountId, channel, enabled],
+  );
+}
+
+export async function listNotificationPrefs(
+  client: PoolClient,
+  businessAccountId: string,
+): Promise<{ channel: NotificationChannel; enabled: boolean }[]> {
+  const { rows } = await client.query<{ channel: NotificationChannel; enabled: boolean }>(
+    `SELECT channel, enabled FROM notification_pref WHERE business_account_id = $1 ORDER BY channel`,
+    [businessAccountId],
+  );
+  return rows;
+}
