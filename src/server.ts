@@ -12,6 +12,8 @@ import { processPendingNotifications } from './notifications/delivery.js';
 import { runDueBillingCycles } from './billing/service.js';
 import { closeExpiredTenders } from './db/repositories/tenders.js';
 import { getRealtimeHub } from './realtime/hub.js';
+import { safeJob } from './ops/safe-job.js';
+import { runBackup } from './ops/backup.js';
 
 async function main(): Promise<void> {
   const app = createApp();
@@ -41,29 +43,32 @@ async function main(): Promise<void> {
 
   // Maintenance: close expired tenders, push status changes to live dashboards, and
   // prune stale matches (REQ 5.6, 11.2) every 15 minutes.
-  queue.register('match.maintenance', async () => {
-    const closed = await withSystem((c) => closeExpiredTenders(c));
-    for (const t of closed) {
-      const accounts = await withSystem(async (c) => {
-        const { rows } = await c.query<{ business_account_id: string }>(
-          `SELECT business_account_id FROM tender_match
-           WHERE tender_source_portal = $1 AND tender_source_identifier = $2`,
-          [t.source_portal, t.source_identifier],
-        );
-        return rows.map((r) => r.business_account_id);
-      });
-      for (const accountId of accounts) {
-        hub.publish(accountId, {
-          type: 'tender_status',
-          sourcePortal: t.source_portal,
-          sourceIdentifier: t.source_identifier,
-          status: 'closed',
+  queue.register(
+    'match.maintenance',
+    safeJob('match.maintenance', async () => {
+      const closed = await withSystem((c) => closeExpiredTenders(c));
+      for (const t of closed) {
+        const accounts = await withSystem(async (c) => {
+          const { rows } = await c.query<{ business_account_id: string }>(
+            `SELECT business_account_id FROM tender_match
+             WHERE tender_source_portal = $1 AND tender_source_identifier = $2`,
+            [t.source_portal, t.source_identifier],
+          );
+          return rows.map((r) => r.business_account_id);
         });
+        for (const accountId of accounts) {
+          hub.publish(accountId, {
+            type: 'tender_status',
+            sourcePortal: t.source_portal,
+            sourceIdentifier: t.source_identifier,
+            status: 'closed',
+          });
+        }
       }
-    }
-    const removed = await pruneExpiredMatches();
-    if (removed > 0) logger.info({ removed }, 'pruned expired matches');
-  });
+      const removed = await pruneExpiredMatches();
+      if (removed > 0) logger.info({ removed }, 'pruned expired matches');
+    }),
+  );
   await queue.scheduleRepeating(
     'match.maintenance',
     {},
@@ -72,11 +77,14 @@ async function main(): Promise<void> {
 
   // Deadline Guard: fire due reminders and close pursued tenders past grace (REQ 8).
   // Also scan documents nearing expiry (REQ 9.4).
-  queue.register('deadline.scan', async () => {
-    await scanReminders();
-    await scanGraceClosures();
-    await scanExpiringDocuments();
-  });
+  queue.register(
+    'deadline.scan',
+    safeJob('deadline.scan', async () => {
+      await scanReminders();
+      await scanGraceClosures();
+      await scanExpiringDocuments();
+    }),
+  );
   await queue.scheduleRepeating(
     'deadline.scan',
     {},
@@ -84,9 +92,12 @@ async function main(): Promise<void> {
   );
 
   // Notification Service: deliver pending notifications with bounded retry (REQ 12).
-  queue.register('notification.dispatch', async () => {
-    await processPendingNotifications();
-  });
+  queue.register(
+    'notification.dispatch',
+    safeJob('notification.dispatch', async () => {
+      await processPendingNotifications();
+    }),
+  );
   await queue.scheduleRepeating(
     'notification.dispatch',
     {},
@@ -94,14 +105,30 @@ async function main(): Promise<void> {
   );
 
   // Subscription billing: charge due subscriptions, retry, and restrict on non-payment (REQ 13).
-  queue.register('billing.cycle', async () => {
-    const processed = await runDueBillingCycles();
-    if (processed > 0) logger.info({ processed }, 'billing cycles processed');
-  });
+  queue.register(
+    'billing.cycle',
+    safeJob('billing.cycle', async () => {
+      const processed = await runDueBillingCycles();
+      if (processed > 0) logger.info({ processed }, 'billing cycles processed');
+    }),
+  );
   await queue.scheduleRepeating(
     'billing.cycle',
     {},
     { everyMs: 24 * 60 * 60_000, jobId: 'billing:cycle' },
+  );
+
+  // Automated backups of tenders, historical records, and document metadata (REQ 17.4).
+  queue.register(
+    'backup.run',
+    safeJob('backup.run', async () => {
+      await runBackup();
+    }),
+  );
+  await queue.scheduleRepeating(
+    'backup.run',
+    {},
+    { everyMs: env.BACKUP_INTERVAL_HOURS * 60 * 60_000, jobId: 'backup:run' },
   );
 
   const server: Server = app.listen(env.PORT, () => {
