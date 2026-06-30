@@ -11,6 +11,7 @@ import { deadlineRouter } from './routes/deadline.js';
 import { documentRouter } from './routes/documents.js';
 import { notificationRouter } from './routes/notifications.js';
 import { billingRouter } from './routes/billing.js';
+import { dashboardRouter } from './routes/dashboard.js';
 
 /**
  * Builds the Express application. Route modules for each service are mounted
@@ -21,6 +22,9 @@ export function createApp(): Application {
   app.disable('x-powered-by');
   app.use(pinoHttp({ logger }));
   app.use(express.json({ limit: '1mb' }));
+
+  // Serve the white/teal dashboard single-page UI.
+  app.use(express.static('public'));
 
   app.get('/health', async (_req: Request, res: Response) => {
     const report = await checkHealth();
@@ -54,4 +58,5 @@ function mountRouters(app: Application): void {
   app.use('/documents', documentRouter());
   app.use('/notifications', notificationRouter());
   app.use('/billing', billingRouter());
+  app.use('/dashboard', dashboardRouter());
 }
