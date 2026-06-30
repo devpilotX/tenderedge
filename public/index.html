@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TenderEdge</title>
+<style>
+  :root{
+    --teal:#0A7A70; --teal-dark:#06564f; --teal-50:#eef6f5; --teal-100:#d7ebe9;
+    --ink:#16242a; --muted:#6a7b80; --faint:#9bacae;
+    --line:#eaf0f0; --line-2:#f3f7f7;
+    --blue:#2f6df0; --amber:#e8930c; --green:#12936a; --rose:#d6455f;
+    --bg:#f4f8f8; --card:#ffffff;
+    --sh:0 2px 6px rgba(13,40,40,.05),0 10px 28px rgba(13,40,40,.05);
+    --sh-lg:0 8px 30px rgba(10,122,112,.14);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{font-family:"Segoe UI",-apple-system,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:14px;-webkit-font-smoothing:antialiased}
+  svg{display:block}
+  .app{display:flex;min-height:100vh}
+  .hidden{display:none !important}
+
+  .sidebar{width:248px;background:#fff;border-right:1px solid var(--line);padding:24px 16px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column}
+  .brand{display:flex;align-items:center;gap:11px;padding:0 8px;margin-bottom:30px}
+  .brand .logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--teal),#0fa093);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(10,122,112,.35)}
+  .brand .name{font-weight:800;font-size:18px;letter-spacing:-.3px}
+  .brand .name span{color:var(--teal)}
+  .nav-label{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);padding:0 12px;margin:18px 0 8px;font-weight:700}
+  .nav a{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;color:var(--muted);text-decoration:none;font-weight:600;margin-bottom:2px;transition:.18s;position:relative;cursor:pointer}
+  .nav a svg{width:19px;height:19px;stroke:currentColor}
+  .nav a:hover{background:var(--line-2);color:var(--ink);transform:translateX(2px)}
+  .nav a.active{background:var(--teal-50);color:var(--teal-dark)}
+  .nav a.active::before{content:"";position:absolute;left:-16px;top:9px;bottom:9px;width:3px;border-radius:0 3px 3px 0;background:var(--teal)}
+  .side-card{margin-top:auto;background:linear-gradient(150deg,var(--teal-dark),var(--teal));border-radius:14px;padding:16px;color:#fff}
+  .side-card .pln{font-size:12px;opacity:.85}
+  .side-card .tr{font-weight:800;font-size:15px;margin:3px 0 10px;text-transform:capitalize}
+  .side-card .up{display:block;text-align:center;background:#fff;color:var(--teal-dark);font-weight:700;padding:8px;border-radius:9px;text-decoration:none;font-size:13px;transition:.18s;cursor:pointer}
+  .side-card .up:hover{transform:translateY(-1px)}
+
+  .main{flex:1;display:flex;flex-direction:column;min-width:0}
+  .topbar{height:66px;background:rgba(255,255,255,.85);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 30px;position:sticky;top:0;z-index:20}
+  .topbar h1{font-size:19px;font-weight:800;letter-spacing:-.3px}
+  .topbar .sub{color:var(--muted);font-size:12.5px;font-weight:500;margin-top:1px}
+  .top-right{display:flex;align-items:center;gap:14px}
+  .live{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--faint);font-weight:700;background:#f0f3f3;padding:8px 13px;border-radius:30px}
+  .live.on{color:var(--teal-dark);background:var(--teal-50)}
+  .pulse{width:8px;height:8px;border-radius:50%;background:var(--faint)}
+  .live.on .pulse{background:var(--teal);box-shadow:0 0 0 0 rgba(10,122,112,.5);animation:p 1.8s infinite}
+  @keyframes p{0%{box-shadow:0 0 0 0 rgba(10,122,112,.5)}70%{box-shadow:0 0 0 9px rgba(10,122,112,0)}100%{box-shadow:0 0 0 0 rgba(10,122,112,0)}}
+  .avatar{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--teal),#0fa093);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px}
+  .logout{border:1px solid var(--line);background:#fff;border-radius:10px;padding:8px 12px;font-weight:600;color:var(--muted);cursor:pointer;font-size:12.5px}
+  .logout:hover{background:var(--line-2)}
+
+  .content{padding:26px 30px 40px;display:flex;flex-direction:column;gap:22px}
+  .reveal{opacity:0;transform:translateY(14px);animation:rise .6s cubic-bezier(.2,.7,.3,1) forwards}
+  @keyframes rise{to{opacity:1;transform:none}}
+
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--sh);transition:transform .2s,box-shadow .2s}
+  .kpi{padding:20px}
+  .kpi:hover{transform:translateY(-4px);box-shadow:var(--sh-lg)}
+  .kpi .row{display:flex;align-items:center;justify-content:space-between}
+  .kpi .lab{font-size:12.5px;color:var(--muted);font-weight:600}
+  .kpi .ic{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center}
+  .kpi .ic svg{width:20px;height:20px}
+  .ic.t{background:var(--teal-50)} .ic.t svg{stroke:var(--teal)}
+  .ic.b{background:#eaf1fe} .ic.b svg{stroke:var(--blue)}
+  .ic.g{background:#e7f5ef} .ic.g svg{stroke:var(--green)}
+  .ic.a{background:#fdf3e3} .ic.a svg{stroke:var(--amber)}
+  .kpi .val{font-size:27px;font-weight:800;margin-top:14px;letter-spacing:-.5px}
+  .kpi .tag{font-size:12px;margin-top:5px;font-weight:600;color:var(--muted)}
+
+  .grid{display:grid;grid-template-columns:1.9fr 1fr;gap:20px;align-items:start}
+  .col{display:flex;flex-direction:column;gap:20px}
+  .ph{display:flex;justify-content:space-between;align-items:center;padding:18px 20px;border-bottom:1px solid var(--line)}
+  .ph h3{font-size:15.5px;font-weight:800;letter-spacing:-.2px;display:flex;align-items:center;gap:9px}
+  .ph h3 .hi{width:30px;height:30px;border-radius:9px;background:var(--teal-50);display:flex;align-items:center;justify-content:center}
+  .ph h3 .hi svg{width:16px;height:16px;stroke:var(--teal)}
+
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);padding:13px 20px;font-weight:700}
+  td{padding:14px 20px;border-top:1px solid var(--line-2);vertical-align:middle}
+  tbody tr{transition:.15s}
+  tbody tr:hover{background:var(--teal-50)}
+  .t-title{font-weight:700}
+  .t-meta{font-size:12px;color:var(--muted);margin-top:3px}
+  .chip{display:inline-block;font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:30px;background:var(--teal-50);color:var(--teal-dark)}
+  .amt{font-weight:700}
+  .score{display:flex;align-items:center;gap:9px;font-weight:800;font-size:13px}
+  .bar{width:56px;height:7px;border-radius:6px;background:#edf3f2;overflow:hidden}
+  .bar i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,var(--teal),#15a596);width:0;transition:width 1.1s cubic-bezier(.2,.7,.3,1)}
+  .dl{font-weight:700;font-size:13px}
+  .dl.soon{color:var(--rose)}
+  .empty{padding:26px 20px;color:var(--muted);text-align:center;font-size:13px}
+
+  .brain{padding:20px;background:linear-gradient(160deg,#fff,#f3faf9)}
+  .brain .pred{font-size:24px;font-weight:800;color:var(--teal-dark);margin:10px 0 2px;letter-spacing:-.5px}
+  .brain .sub{font-size:12px;color:var(--muted)}
+  .premium{font-size:10.5px;font-weight:800;letter-spacing:.04em;color:#8a5a00;background:linear-gradient(90deg,#ffe6ad,#ffd98a);padding:4px 9px;border-radius:30px}
+  .conf{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--muted);font-weight:700;margin-top:16px}
+  .conf .bar{width:auto;flex:1}
+
+  .pipe{padding:6px 20px 20px}
+  .pr{margin-top:16px}
+  .pr .top{display:flex;justify-content:space-between;align-items:center}
+  .pr .nm{font-size:13px;font-weight:700;text-transform:capitalize}
+  .pr .nm small{color:var(--faint);font-weight:600;margin-left:6px}
+  .pr .va{font-size:13px;font-weight:800;color:var(--teal-dark)}
+  .pl{height:8px;border-radius:6px;background:#edf3f2;overflow:hidden;margin-top:7px}
+  .pl i{display:block;height:100%;border-radius:6px;width:0;background:var(--teal);transition:width 1.1s cubic-bezier(.2,.7,.3,1)}
+  .ptot{margin:18px 20px 0;padding:14px 0 0;border-top:1px dashed var(--line);display:flex;justify-content:space-between;font-weight:800}
+
+  .act{display:flex;gap:13px;padding:15px 20px;border-top:1px solid var(--line-2);align-items:center}
+  .act .ai{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:var(--teal-50)}
+  .act .ai svg{width:17px;height:17px;stroke:var(--teal)}
+  .act .tx b{display:block;font-size:13.5px;font-weight:700}
+  .act .tx span{font-size:12px;color:var(--muted)}
+  .foot{color:var(--faint);font-size:12px;text-align:center;padding:6px}
+
+  .auth{min-height:100vh;display:flex;align-items:center;justify-content:center;background:radial-gradient(1200px 600px at 70% -10%,var(--teal-50),var(--bg))}
+  .auth .box{width:380px;background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:var(--sh);padding:30px}
+  .auth .blogo{display:flex;align-items:center;gap:11px;margin-bottom:22px}
+  .auth .blogo .logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--teal),#0fa093);display:flex;align-items:center;justify-content:center}
+  .auth h2{font-size:19px;font-weight:800}
+  .auth p.s{color:var(--muted);font-size:13px;margin-top:3px;margin-bottom:18px}
+  .field{margin-bottom:13px}
+  .field label{display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px}
+  .field input,.field select{width:100%;border:1px solid var(--line);border-radius:10px;padding:11px 13px;font-size:14px;background:#fafdfd;outline:none}
+  .field input:focus,.field select:focus{border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-50)}
+  .btn{width:100%;background:var(--teal);color:#fff;border:none;border-radius:10px;padding:12px;font-weight:700;font-size:14px;cursor:pointer;transition:.18s}
+  .btn:hover{background:var(--teal-dark)}
+  .btn:disabled{opacity:.6;cursor:not-allowed}
+  .switch{text-align:center;margin-top:14px;font-size:13px;color:var(--muted)}
+  .switch a{color:var(--teal);font-weight:700;cursor:pointer}
+  .err{background:#fdecef;color:var(--rose);border:1px solid #f6c9d2;border-radius:9px;padding:10px 12px;font-size:12.5px;margin-bottom:14px}
+
+  @media(max-width:1080px){.kpis{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}.sidebar{display:none}}
+</style>
+</head>
+<body>
+  <div id="auth" class="auth">
+    <div class="box">
+      <div class="blogo">
+        <span class="logo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9"/><path d="M12 12 8 8"/><circle cx="12" cy="12" r="2.4" fill="#fff" stroke="none"/></svg></span>
+        <div><h2>Tender<span style="color:var(--teal)">Edge</span></h2></div>
+      </div>
+      <p class="s" id="authSub">Sign in to your industrial tender dashboard.</p>
+      <div id="authErr" class="err hidden"></div>
+      <div id="fldBusiness" class="field hidden"><label>Business name</label><input id="iBusiness" placeholder="Sharma Industrial Couplings" /></div>
+      <div id="fldTier" class="field hidden"><label>Plan</label><select id="iTier"><option value="basic">Basic · 5 regions</option><option value="premium" selected>Premium · 20 regions · Bid Brain</option><option value="enterprise">Enterprise · 100 regions · Bid Brain</option></select></div>
+      <div class="field"><label>Email</label><input id="iEmail" type="email" placeholder="owner@business.example" /></div>
+      <div class="field"><label>Password</label><input id="iPassword" type="password" placeholder="••••••••" /></div>
+      <button class="btn" id="authBtn">Sign in</button>
+      <div class="switch" id="authSwitch">New to TenderEdge? <a id="toRegister">Create an account</a></div>
+    </div>
+  </div>
+
+  <div id="appRoot" class="app hidden">
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="logo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9"/><path d="M12 12 8 8"/><circle cx="12" cy="12" r="2.4" fill="#fff" stroke="none"/></svg></span>
+        <span class="name">Tender<span>Edge</span></span>
+      </div>
+      <nav class="nav">
+        <a class="active"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Dashboard</a>
+        <a><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.2"/><path d="M4.9 4.9a10 10 0 0 0 0 14.2M19.1 4.9a10 10 0 0 1 0 14.2"/></svg>Tender Radar</a>
+        <a><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/></svg>Smart Match</a>
+        <a><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 6 0 3 3 0 0 0 2-5 3 3 0 0 0-2-5 3 3 0 0 0-3-3Z"/><path d="M12 7v10M9 12h6"/></svg>Bid Brain</a>
+        <div class="nav-label">Manage</div>
+        <a><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Deadline Guard</a>
+        <a><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>Documents</a>
+        <a><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3 10h18"/></svg>Billing</a>
+      </nav>
+      <div class="side-card">
+        <div class="pln">Current plan</div>
+        <div class="tr" id="planName">—</div>
+        <a class="up" id="upgradeBtn">Manage plan</a>
+      </div>
+    </aside>
+
+    <div class="main">
+      <header class="topbar">
+        <div><h1>Dashboard</h1><div class="sub" id="acctSub">—</div></div>
+        <div class="top-right">
+          <div class="live" id="liveBadge"><span class="pulse"></span><span id="liveText">Offline</span></div>
+          <div class="avatar" id="avatar">··</div>
+          <button class="logout" id="logoutBtn">Sign out</button>
+        </div>
+      </header>
+
+      <div class="content">
+        <section class="kpis">
+          <div class="card kpi reveal"><div class="row"><span class="lab">Live Matched Tenders</span><span class="ic t"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.2"/><path d="M4.9 4.9a10 10 0 0 0 0 14.2M19.1 4.9a10 10 0 0 1 0 14.2"/></svg></span></div><div class="val" id="kpiMatched">0</div><div class="tag" id="kpiMatchedTag">live opportunities</div></div>
+          <div class="card kpi reveal"><div class="row"><span class="lab">Avg Win Chance</span><span class="ic b"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/></svg></span></div><div class="val"><span id="kpiWin">0</span>%</div><div class="tag">across matched tenders</div></div>
+          <div class="card kpi reveal"><div class="row"><span class="lab">Money Pipeline</span><span class="ic g"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span></div><div class="val" id="kpiPipeline">₹0</div><div class="tag">pursued tenders</div></div>
+          <div class="card kpi reveal"><div class="row"><span class="lab">Deadlines This Week</span><span class="ic a"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span></div><div class="val" id="kpiDeadlines">0</div><div class="tag">closing soon</div></div>
+        </section>
+
+        <section class="grid">
+          <div class="card reveal">
+            <div class="ph"><h3><span class="hi"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg></span>Top Matched Tenders</h3></div>
+            <table><thead><tr><th>Tender</th><th>Region</th><th>Value</th><th>Win Chance</th><th>Deadline</th></tr></thead><tbody id="tenderRows"></tbody></table>
+            <div id="tendersEmpty" class="empty hidden">No matched tenders yet. Configure your Smart Match filters to start seeing opportunities.</div>
+          </div>
+          <div class="col">
+            <div class="card brain reveal" id="brainCard">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <h3 style="font-size:15.5px;font-weight:800;display:flex;align-items:center;gap:9px"><span class="hi" style="width:30px;height:30px;border-radius:9px;background:var(--teal-50);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--teal)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 6 0 3 3 0 0 0 2-5 3 3 0 0 0-2-5 3 3 0 0 0-3-3Z"/></svg></span>Bid Brain</h3>
+                <span class="premium" id="brainBadge">PREMIUM</span>
+              </div>
+              <div class="sub" id="brainSub" style="margin-top:12px">No prediction yet</div>
+              <div class="pred" id="brainPred">—</div>
+              <div class="sub">Likely winning price range</div>
+              <div class="conf">Confidence<span class="bar"><i id="brainConfBar"></i></span><span id="brainConf">0%</span></div>
+            </div>
+            <div class="card reveal">
+              <div class="ph"><h3><span class="hi"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 14 3-4 3 2 4-6"/></svg></span>Money Pipeline</h3></div>
+              <div class="pipe" id="pipeRows"></div>
+              <div class="ptot"><span>Total pipeline</span><span id="pipeTotal">₹0</span></div><div style="height:6px"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card reveal">
+          <div class="ph"><h3><span class="hi"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z"/></svg></span>Recommended Next Actions</h3></div>
+          <div id="actionRows"></div>
+          <div id="actionsEmpty" class="empty hidden">Pursue a tender from your matches to get deadline-driven recommendations.</div>
+        </section>
+        <div class="foot">TenderEdge · clean white &amp; teal #0A7A70 · live data</div>
+      </div>
+    </div>
+  </div>
+
+<script>
+const S = { token: localStorage.getItem('te_token'), mode: 'login' };
+const $ = (id) => document.getElementById(id);
+
+function fmtINR(v){
+  if(v==null) return '—';
+  const n = Number(v);
+  if(n>=1e7) return '₹'+(n/1e7).toFixed(2)+' Cr';
+  if(n>=1e5) return '₹'+(n/1e5).toFixed(1)+' L';
+  return '₹'+n.toLocaleString('en-IN');
+}
+function daysTo(iso){ if(!iso) return null; return Math.ceil((new Date(iso).getTime()-Date.now())/86400000); }
+function dlText(iso){ const d=daysTo(iso); if(d==null) return '—'; if(d<0) return 'passed'; if(d===0) return 'today'; if(d===1) return '1 day'; return d+' days'; }
+
+async function api(path, opts={}){
+  const headers = Object.assign({'content-type':'application/json'}, opts.headers||{});
+  if(S.token) headers.authorization = 'Bearer '+S.token;
+  const res = await fetch(path, Object.assign({}, opts, {headers}));
+  if(res.status===204) return null;
+  const body = await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(body?.error?.message || ('Request failed ('+res.status+')'));
+  return body;
+}
+
+function setMode(mode){
+  S.mode = mode;
+  const reg = mode==='register';
+  $('fldBusiness').classList.toggle('hidden', !reg);
+  $('fldTier').classList.toggle('hidden', !reg);
+  $('authBtn').textContent = reg ? 'Create account' : 'Sign in';
+  $('authSub').textContent = reg ? 'Create your business account to get started.' : 'Sign in to your industrial tender dashboard.';
+  $('authSwitch').innerHTML = reg ? 'Already registered? <a id="toLogin">Sign in</a>' : 'New to TenderEdge? <a id="toRegister">Create an account</a>';
+  $('authErr').classList.add('hidden');
+  wireSwitch();
+}
+function wireSwitch(){
+  const r=$('toRegister'), l=$('toLogin');
+  if(r) r.onclick=()=>setMode('register');
+  if(l) l.onclick=()=>setMode('login');
+}
+async function submitAuth(){
+  const btn=$('authBtn'); btn.disabled=true;
+  $('authErr').classList.add('hidden');
+  try{
+    const email=$('iEmail').value.trim(), password=$('iPassword').value;
+    if(S.mode==='register'){
+      await api('/auth/register',{method:'POST',body:JSON.stringify({businessName:$('iBusiness').value.trim(),email,password,tier:$('iTier').value})});
+    }
+    const r = await api('/auth/login',{method:'POST',body:JSON.stringify({email,password})});
+    S.token=r.sessionToken; localStorage.setItem('te_token',S.token);
+    showApp(); await loadDashboard(); connectWs();
+  }catch(e){ $('authErr').textContent=e.message; $('authErr').classList.remove('hidden'); }
+  finally{ btn.disabled=false; }
+}
+
+function showApp(){ $('auth').classList.add('hidden'); $('appRoot').classList.remove('hidden'); }
+function showAuth(){ $('appRoot').classList.add('hidden'); $('auth').classList.remove('hidden'); }
+function logout(){ try{ api('/auth/logout',{method:'POST'}); }catch(_){} localStorage.removeItem('te_token'); S.token=null; if(ws){try{ws.close();}catch(_){}} showAuth(); }
+
+function render(d){
+  $('acctSub').textContent = (d.account?.name||'Business') + ' · ' + (d.account?.tier||'');
+  $('planName').textContent = (d.account?.tier||'—') + (d.bidBrainEnabled?' · Bid Brain':'');
+  $('avatar').textContent = (d.account?.name||'TE').slice(0,2).toUpperCase();
+  $('kpiMatched').textContent = d.kpis.liveMatchedTenders;
+  $('kpiWin').textContent = d.kpis.avgWinChance;
+  $('kpiPipeline').textContent = fmtINR(d.kpis.moneyPipelineTotal);
+  $('kpiDeadlines').textContent = d.kpis.deadlinesThisWeek;
+
+  const tb=$('tenderRows'); tb.innerHTML='';
+  $('tendersEmpty').classList.toggle('hidden', d.matchedTenders.length>0);
+  d.matchedTenders.slice(0,8).forEach(t=>{
+    const tr=document.createElement('tr');
+    const soon = (daysTo(t.deadline)??99)<=1?'soon':'';
+    tr.innerHTML = `<td><div class="t-title">${esc(t.title)}</div><div class="t-meta">${esc(t.sourcePortal)} · ${esc(t.sourceIdentifier)}</div></td>
+      <td>${t.region?`<span class="chip">${esc(t.region)}</span>`:'—'}</td>
+      <td class="amt">${fmtINR(t.estimatedValue)}</td>
+      <td><div class="score">${t.winChance}<span class="bar"><i style="width:${t.winChance}%"></i></span></div></td>
+      <td class="dl ${soon}">${dlText(t.deadline)}</td>`;
+    tb.appendChild(tr);
+  });
+
+  if(d.bidBrainEnabled){
+    $('brainBadge').classList.remove('hidden');
+    const p = d.predictions[0];
+    if(p){
+      $('brainSub').textContent = p.sourcePortal+' · '+p.sourceIdentifier;
+      $('brainPred').textContent = fmtINR(p.lower)+' – '+fmtINR(p.upper);
+      const pct=Math.round(p.confidence*100);
+      $('brainConf').textContent=pct+'%'; $('brainConfBar').style.width=pct+'%';
+    } else {
+      $('brainSub').textContent='Pursue a tender to get a price prediction'; $('brainPred').textContent='—';
+      $('brainConf').textContent='0%'; $('brainConfBar').style.width='0%';
+    }
+  } else {
+    $('brainBadge').textContent='UPGRADE';
+    $('brainSub').textContent='Bid Brain is a Premium feature'; $('brainPred').textContent='Upgrade to unlock';
+    $('brainConf').textContent='—'; $('brainConfBar').style.width='0%';
+  }
+
+  const order=['watching','preparing','submitted','won','lost'];
+  const pr=$('pipeRows'); pr.innerHTML='';
+  const max=Math.max(1,...d.moneyPipeline.map(s=>s.totalValue));
+  d.moneyPipeline.sort((a,b)=>order.indexOf(a.stage)-order.indexOf(b.stage)).forEach(s=>{
+    const row=document.createElement('div'); row.className='pr';
+    row.innerHTML=`<div class="top"><span class="nm">${esc(s.stage)}<small>${s.count}</small></span><span class="va">${fmtINR(s.totalValue)}</span></div><div class="pl"><i style="width:${Math.round(s.totalValue/max*100)}%"></i></div>`;
+    pr.appendChild(row);
+  });
+  if(d.moneyPipeline.length===0) pr.innerHTML='<div class="empty">No tenders in your pipeline yet.</div>';
+  $('pipeTotal').textContent=fmtINR(d.kpis.moneyPipelineTotal);
+
+  const ar=$('actionRows'); ar.innerHTML='';
+  $('actionsEmpty').classList.toggle('hidden', d.recommendedActions.length>0);
+  d.recommendedActions.forEach(a=>{
+    const el=document.createElement('div'); el.className='act';
+    el.innerHTML=`<span class="ai"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z"/></svg></span>
+      <div class="tx"><b>${esc(a.title)}</b><span>Stage: ${esc(a.stage)} · closes ${dlText(a.deadline)}</span></div>`;
+    ar.appendChild(el);
+  });
+}
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+async function loadDashboard(){
+  try{ render(await api('/dashboard/summary')); }
+  catch(e){ if(/expired|Authentication/i.test(e.message)){ logout(); } }
+}
+
+let ws=null, reconnectTimer=null, reloadTimer=null;
+function setLive(on){ const b=$('liveBadge'); b.classList.toggle('on',on); $('liveText').textContent=on?'Live':'Offline'; }
+function connectWs(){
+  if(!S.token) return;
+  const proto = location.protocol==='https:'?'wss':'ws';
+  ws = new WebSocket(`${proto}://${location.host}/ws?token=${encodeURIComponent(S.token)}`);
+  ws.onopen = ()=> setLive(true);
+  ws.onmessage = ()=>{ clearTimeout(reloadTimer); reloadTimer=setTimeout(loadDashboard,400); };
+  ws.onclose = ()=>{ setLive(false); if(S.token){ clearTimeout(reconnectTimer); reconnectTimer=setTimeout(()=>{ connectWs(); loadDashboard(); },3000); } };
+  ws.onerror = ()=>{ try{ws.close();}catch(_){} };
+}
+
+$('authBtn').onclick=submitAuth;
+[$('iEmail'),$('iPassword')].forEach(el=>el.addEventListener('keydown',e=>{if(e.key==='Enter')submitAuth();}));
+$('logoutBtn').onclick=logout;
+$('upgradeBtn').onclick=()=>alert('Open Billing to change your plan (POST /billing/change-tier).');
+wireSwitch();
+if(S.token){ showApp(); loadDashboard().then(connectWs); } else { showAuth(); }
+</script>
+</body>
+</html>

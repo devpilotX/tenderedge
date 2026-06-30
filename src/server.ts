@@ -11,24 +11,56 @@ import { scanExpiringDocuments } from './documents/service.js';
 import { processPendingNotifications } from './notifications/delivery.js';
 import { runDueBillingCycles } from './billing/service.js';
 import { closeExpiredTenders } from './db/repositories/tenders.js';
+import { getRealtimeHub } from './realtime/hub.js';
 
 async function main(): Promise<void> {
   const app = createApp();
   const queue = getQueue();
+  const hub = getRealtimeHub();
   await queue.start();
   logger.info({ driver: queue.driver }, 'job queue started');
 
   // Tender Radar: schedule polling for every configured portal (auto-recovers on restart).
-  // Each upserted tender is evaluated by Smart Match against all configured accounts.
+  // Each upserted tender is evaluated by Smart Match against all configured accounts,
+  // and new matches are pushed to live dashboards over WebSocket (REQ 11.1).
   await registerRadarJobs(queue, {
     onUpserted: async (tender) => {
-      await evaluateTender(tender);
+      await evaluateTender(tender, {
+        onMatched: (m) => {
+          hub.publish(m.businessAccountId, {
+            type: 'match',
+            sourcePortal: m.sourcePortal,
+            sourceIdentifier: m.sourceIdentifier,
+            title: tender.title,
+            matchScore: m.matchScore,
+          });
+        },
+      });
     },
   });
 
-  // Maintenance: close expired tenders and prune stale matches (REQ 5.6) every 15 minutes.
+  // Maintenance: close expired tenders, push status changes to live dashboards, and
+  // prune stale matches (REQ 5.6, 11.2) every 15 minutes.
   queue.register('match.maintenance', async () => {
-    await withSystem((c) => closeExpiredTenders(c));
+    const closed = await withSystem((c) => closeExpiredTenders(c));
+    for (const t of closed) {
+      const accounts = await withSystem(async (c) => {
+        const { rows } = await c.query<{ business_account_id: string }>(
+          `SELECT business_account_id FROM tender_match
+           WHERE tender_source_portal = $1 AND tender_source_identifier = $2`,
+          [t.source_portal, t.source_identifier],
+        );
+        return rows.map((r) => r.business_account_id);
+      });
+      for (const accountId of accounts) {
+        hub.publish(accountId, {
+          type: 'tender_status',
+          sourcePortal: t.source_portal,
+          sourceIdentifier: t.source_identifier,
+          status: 'closed',
+        });
+      }
+    }
     const removed = await pruneExpiredMatches();
     if (removed > 0) logger.info({ removed }, 'pruned expired matches');
   });
@@ -75,6 +107,9 @@ async function main(): Promise<void> {
   const server: Server = app.listen(env.PORT, () => {
     logger.info({ port: env.PORT, env: env.NODE_ENV }, 'TenderEdge API listening');
   });
+
+  // Realtime dashboard updates over WebSocket at /ws (REQ 11).
+  hub.attach(server);
 
   const shutdown = async (signal: string): Promise<void> => {
     logger.info({ signal }, 'shutting down');
