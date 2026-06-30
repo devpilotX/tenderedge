@@ -8,6 +8,7 @@ import { registerRadarJobs } from './radar/scheduler.js';
 import { evaluateTender, pruneExpiredMatches } from './match/service.js';
 import { scanReminders, scanGraceClosures } from './deadline/service.js';
 import { scanExpiringDocuments } from './documents/service.js';
+import { processPendingNotifications } from './notifications/delivery.js';
 import { closeExpiredTenders } from './db/repositories/tenders.js';
 
 async function main(): Promise<void> {
@@ -47,6 +48,16 @@ async function main(): Promise<void> {
     'deadline.scan',
     {},
     { everyMs: 5 * 60_000, jobId: 'deadline:scan' },
+  );
+
+  // Notification Service: deliver pending notifications with bounded retry (REQ 12).
+  queue.register('notification.dispatch', async () => {
+    await processPendingNotifications();
+  });
+  await queue.scheduleRepeating(
+    'notification.dispatch',
+    {},
+    { everyMs: 60_000, jobId: 'notification:dispatch' },
   );
 
   const server: Server = app.listen(env.PORT, () => {

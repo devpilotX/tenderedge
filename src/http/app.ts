@@ -9,6 +9,7 @@ import { matchRouter } from './routes/match.js';
 import { bidBrainRouter } from './routes/bidbrain.js';
 import { deadlineRouter } from './routes/deadline.js';
 import { documentRouter } from './routes/documents.js';
+import { notificationRouter } from './routes/notifications.js';
 
 /**
  * Builds the Express application. Route modules for each service are mounted
@@ -50,4 +51,5 @@ function mountRouters(app: Application): void {
   app.use('/bidbrain', bidBrainRouter());
   app.use('/deadline', deadlineRouter());
   app.use('/documents', documentRouter());
+  app.use('/notifications', notificationRouter());
 }
