@@ -19,6 +19,11 @@ const EnvSchema = z.object({
   PGDATABASE: z.string().default('tenderedge'),
   PGDATABASE_TEST: z.string().default('tenderedge_test'),
   PG_POOL_MAX: z.coerce.number().int().positive().default(10),
+  // Non-superuser role the app uses for tenant-scoped queries so Row-Level
+  // Security is actually enforced (superusers bypass RLS). Created by migrations.
+  // Trust auth on localhost means no password is needed locally.
+  PGAPPUSER: z.string().default('tenderedge_app'),
+  PGAPPPASSWORD: z.string().default(''),
 
   QUEUE_DRIVER: z.enum(['redis', 'memory']).default('memory'),
   REDIS_URL: z.string().default('redis://localhost:6379'),

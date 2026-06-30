@@ -1,6 +1,6 @@
 import { Client } from 'pg';
 import { env } from '../src/config/env.js';
-import { getPool, query } from '../src/db/pool.js';
+import { getAdminPool } from '../src/db/pool.js';
 import { migrateUp } from '../src/db/migrate.js';
 
 let schemaReady = false;
@@ -33,16 +33,20 @@ export async function ensureTestSchema(): Promise<void> {
 }
 
 /**
- * Truncates all tenant/data tables for test isolation. Keeps schema and
- * reference data (source_portals are reseeded by tests that need them).
+ * Truncates all tenant/data tables for test isolation via the admin pool (the app
+ * role intentionally lacks TRUNCATE). Partitions are skipped — truncating the
+ * partitioned parent cascades to them.
  */
 export async function resetData(): Promise<void> {
-  const pool = getPool();
+  const pool = getAdminPool();
   const { rows } = await pool.query<{ tablename: string }>(`
     SELECT tablename FROM pg_tables
-    WHERE schemaname = 'public' AND tablename <> 'schema_migrations'
+    WHERE schemaname = 'public'
+      AND tablename <> 'schema_migrations'
+      AND tablename NOT LIKE '%\\_p_'
+      AND tablename NOT LIKE 'historical\\_tender\\_record\\_%'
   `);
   if (rows.length === 0) return;
   const list = rows.map((r) => `"${r.tablename}"`).join(', ');
-  await query(`TRUNCATE ${list} RESTART IDENTITY CASCADE`);
+  await pool.query(`TRUNCATE ${list} RESTART IDENTITY CASCADE`);
 }

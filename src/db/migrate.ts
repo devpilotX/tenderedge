@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import type { PoolClient } from 'pg';
-import { getPool, closePool, withTransaction } from './pool.js';
+import { getAdminPool, closePool, withAdminTransaction } from './pool.js';
 import { logger } from '../core/logger.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -46,7 +46,7 @@ async function appliedIds(client: PoolClient): Promise<Set<string>> {
 export async function migrateUp(): Promise<string[]> {
   const migrations = loadMigrations();
   const applied: string[] = [];
-  await withTransaction(async (client) => {
+  await withAdminTransaction(async (client) => {
     await ensureMigrationsTable(client);
     const done = await appliedIds(client);
     for (const m of migrations) {
@@ -63,7 +63,7 @@ export async function migrateUp(): Promise<string[]> {
 export async function migrateDown(steps = 1): Promise<string[]> {
   const migrations = loadMigrations();
   const reverted: string[] = [];
-  await withTransaction(async (client) => {
+  await withAdminTransaction(async (client) => {
     await ensureMigrationsTable(client);
     const done = await appliedIds(client);
     const toRevert = migrations
@@ -86,8 +86,8 @@ export async function migrateDown(steps = 1): Promise<string[]> {
 
 export async function migrationStatus(): Promise<{ id: string; applied: boolean }[]> {
   const migrations = loadMigrations();
-  await withTransaction((client) => ensureMigrationsTable(client));
-  const done = await getPool()
+  await withAdminTransaction((client) => ensureMigrationsTable(client));
+  const done = await getAdminPool()
     .query<{ id: string }>('SELECT id FROM schema_migrations')
     .then((r) => new Set(r.rows.map((x) => x.id)));
   return migrations.map((m) => ({ id: m.id, applied: done.has(m.id) }));
