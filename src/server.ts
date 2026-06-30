@@ -7,6 +7,7 @@ import { closePool, withSystem } from './db/pool.js';
 import { registerRadarJobs } from './radar/scheduler.js';
 import { evaluateTender, pruneExpiredMatches } from './match/service.js';
 import { scanReminders, scanGraceClosures } from './deadline/service.js';
+import { scanExpiringDocuments } from './documents/service.js';
 import { closeExpiredTenders } from './db/repositories/tenders.js';
 
 async function main(): Promise<void> {
@@ -36,9 +37,11 @@ async function main(): Promise<void> {
   );
 
   // Deadline Guard: fire due reminders and close pursued tenders past grace (REQ 8).
+  // Also scan documents nearing expiry (REQ 9.4).
   queue.register('deadline.scan', async () => {
     await scanReminders();
     await scanGraceClosures();
+    await scanExpiringDocuments();
   });
   await queue.scheduleRepeating(
     'deadline.scan',
