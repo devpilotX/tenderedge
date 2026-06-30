@@ -1,0 +1,145 @@
+# Implementation Plan
+
+- [x] 1. Project setup and shared foundations
+  - Initialize the Node.js/TypeScript backend, linting, formatting, and the test runner with a property-based testing library.
+  - Set up PostgreSQL connection, migration tooling, and a Redis-backed job queue.
+  - Create the base configuration loader for source portals, intervals, and tier limits.
+  - _Requirements: 15, 17_
+
+- [x] 2. Data layer and multi-tenant isolation
+- [x] 2.1 Create core schema and migrations
+  - Implement migrations for BusinessAccount, BusinessUser, Tender, MatchFilter, TenderMatch, PursuedTender, HistoricalTenderRecord, PricePrediction, BusinessDocument, Subscription, NotificationPref, NotificationLog, and SourcePortal.
+  - Add partitioning and indexes on Tender and HistoricalTenderRecord for `(product_category, region, deadline)`.
+  - _Requirements: 1, 6, 15_
+- [x] 2.2 Implement tenant-scoped data-access layer with Row-Level Security
+  - Enforce `business_account_id` scoping in the repository layer and enable PostgreSQL RLS policies.
+  - _Requirements: 1.3, 1.4, 16.3, 16.4_
+- [x] 2.3 Write property test for tenant isolation invariant
+  - Property: for randomly generated records across multiple tenants, a query under one tenant never returns another tenant's rows (INV1).
+  - _Requirements: 1.3, 1.4, 16.4_
+
+- [x] 3. Auth & Tenant Service
+- [x] 3.1 Implement registration with duplicate-email rejection
+  - Create Business_Account and owner user; reject duplicate emails with the appropriate message.
+  - _Requirements: 1.1, 1.2, 1.5_
+- [x] 3.2 Implement authentication, sessions, and password hashing
+  - Issue sessions on valid credentials, deny invalid ones, hash passwords with argon2id, and expire sessions after 30 minutes of inactivity.
+  - _Requirements: 2.1, 2.2, 2.3, 2.6_
+- [x] 3.3 Implement role-based access control
+  - Assign one role per user and enforce viewer read-only behavior only within authenticated sessions.
+  - _Requirements: 2.4, 2.5_
+- [x] 3.4 Write property test for viewer immutability
+  - Property: any sequence of actions by a viewer-role user produces no state change (INV5).
+  - _Requirements: 2.5_
+
+- [x] 4. Tender Radar (scraping and aggregation)
+- [x] 4.1 Implement source portal scheduler
+  - Poll each configured Source_Portal on a configurable interval defaulting to 15 minutes, with automatic recovery after restart.
+  - _Requirements: 3.1, 17.3_
+- [x] 4.2 Implement public-data scraper workers with policy and rate-limit enforcement
+  - Fetch only public, policy-permitted resources; apply per-portal rate limits; treat a zero rate limit as a config error and use a minimum default; skip disallowed resources; log every exclusion check; exclude personal contact details.
+  - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
+- [x] 4.3 Implement the Aggregation Engine parse, normalize, and upsert
+  - Parse listings, normalize Region and Product_Category to platform vocabularies, dedupe by `(source_portal, source_identifier)`, preserve existing complete fields on incomplete updates, and mark missing deadlines and missing-or-zero values as unknown. Record source and retrieval timestamp.
+  - _Requirements: 3.2, 3.3, 3.5, 3.6, 4.4_
+- [x] 4.4 Implement per-portal failure isolation
+  - Record failures, retry next interval, and continue polling other portals.
+  - _Requirements: 3.4, 17.2_
+- [x] 4.5 Write property test for scraper parse/normalize round-trip
+  - Property: parse then serialize then re-parse a listing yields an equivalent normalized Tender (RT1).
+  - _Requirements: 3.2, 3.6_
+- [x] 4.6 Write property test for upsert idempotence
+  - Property: upserting the same unchanged listing twice equals a single upsert (ID1, INV2).
+  - _Requirements: 3.3_
+
+- [x] 5. Smart Match Service
+- [x] 5.1 Implement match filter configuration
+  - Store target Regions, Product_Categories, and min/max estimated value per account.
+  - _Requirements: 5.1_
+- [x] 5.2 Implement match evaluation and Match_Score computation
+  - On new/updated tenders, evaluate against accounts whose filters and tier-permitted Regions match; compute a Match_Score in [0,100] from Region, value, deadline, and category alignment.
+  - _Requirements: 5.2, 5.3, 5.5_
+- [x] 5.3 Implement ranked match listing and expiry removal
+  - Return matches ordered by descending Match_Score; remove tenders from all match lists when their deadline passes.
+  - _Requirements: 5.4, 5.6_
+- [x] 5.4 Write property test for score bounds and tier filtering
+  - Properties: every Match_Score is within [0,100] (INV4); adding a Region outside an account's tier never increases its match count (MM1); re-evaluation of an unchanged tender is idempotent (ID2).
+  - _Requirements: 5.2, 5.3, 5.5_
+
+- [x] 6. Historical Data + Bid Brain Service
+- [x] 6.1 Implement historical outcome recording
+  - On tender close with awarded price, store a Historical_Tender_Record retained 5+ years with available associations; mark zero or missing awarded prices as unknown pending validation.
+  - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5_
+- [x] 6.2 Implement Bid Brain prediction with entitlement gating
+  - For entitled accounts, automatically compute a Price_Range_Prediction (lower, upper, confidence 0-1) per pursued tender from matching historical records; return insufficient-data when fewer than 10 matches; deny non-entitled requests with an upgrade message.
+  - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6_
+- [x] 6.3 Write property test for prediction bounds
+  - Properties: `lower <= upper` and `0 <= confidence <= 1` for every prediction (INV3); more matching records never trigger insufficient-data behavior incorrectly (MM2).
+  - _Requirements: 7.3, 7.5, 7.6_
+
+- [x] 7. Deadline Guard Service
+- [x] 7.1 Implement deadline tracking for pursued tenders
+  - Track submission deadlines when an account pursues a tender.
+  - _Requirements: 8.1_
+- [x] 7.2 Implement default and custom reminder triggers
+  - Fire reminders at 7 days and 1 day by default, or at account-configured custom intervals.
+  - _Requirements: 8.2, 8.3, 8.4_
+- [x] 7.3 Implement grace-period closure
+  - After the deadline passes, wait a configurable grace period, then mark the pursued tender closed.
+  - _Requirements: 8.5_
+
+- [x] 8. Document Helper Service
+- [x] 8.1 Implement encrypted document upload and labeling
+  - Store uploads in encrypted object storage scoped to the account with type and expiry; reject files over 50 MB; encrypt in transit.
+  - _Requirements: 9.1, 9.2, 9.6, 16.1, 16.2_
+- [x] 8.2 Implement document listing, deletion, and authorized retrieval
+  - Return only active-storage documents; support deletion; authorize retrieval against the account and deny cross-tenant access (silently permitted).
+  - _Requirements: 9.3, 9.5, 16.3, 16.4_
+- [x] 8.3 Implement document expiry reminders
+  - Trigger an expiry reminder when 30 days or fewer remain.
+  - _Requirements: 9.4_
+- [x] 8.4 Write property test for document storage round-trip
+  - Property: a stored then retrieved document returns byte-identical content (RT2).
+  - _Requirements: 9.1, 9.3_
+
+- [x] 9. Notification Service
+- [x] 9.1 Implement multi-channel delivery with preferences
+  - Support email, SMS, and in-app channels; deliver through every enabled channel; allow per-user channel toggling.
+  - _Requirements: 12.1, 12.2, 12.4_
+- [x] 9.2 Implement bounded retry and outcome logging
+  - Retry failed delivery up to 3 times, record the final outcome, and increment retry counts only on actual failures; do not re-send already delivered notifications.
+  - _Requirements: 12.3_
+
+- [x] 10. Subscription & Billing Service
+- [x] 10.1 Implement tiers, entitlements, and region limits
+  - Define Basic (<=5 Regions, no Bid Brain), Premium (<=20, Bid Brain), Enterprise (>=100, Bid Brain); grant entitlements on subscribe; reject region selections beyond the tier limit.
+  - _Requirements: 13.1, 13.2, 14.1, 14.2, 14.3_
+- [x] 10.2 Implement monthly billing with retry and read-only restriction
+  - Charge monthly; retry failed charges up to 3 times over 7 days with notification; restrict to read-only when unpaid beyond the retry period.
+  - _Requirements: 13.3, 13.4, 13.5_
+- [x] 10.3 Implement tier change and downgrade region selection
+  - Apply tier changes at the next billing cycle; on downgrade exceeding the region limit, prompt the account to select Regions to retain.
+  - _Requirements: 13.6, 13.7_
+
+- [x] 11. Dashboard and Realtime Hub
+- [x] 11.1 Implement dashboard aggregation API
+  - Return live matched tenders, per-tender win-chance (Match_Score), Money_Pipeline grouped by stage, recommended next actions ordered by deadline proximity, and predictions where Bid Brain is enabled.
+  - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5_
+- [x] 11.2 Implement websocket realtime push with reconnect-and-resync
+  - Push new matches and status changes to active sessions within 5 seconds; reconnect and resynchronize on dropped connections.
+  - _Requirements: 11.1, 11.2, 11.3_
+- [x] 11.3 Build the web dashboard UI (classic white + teal #0A7A70)
+  - Implement the single-screen dashboard consuming the aggregation API and websocket feed.
+  - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5_
+
+- [x] 12. Reliability, backups, and performance hardening
+- [x] 12.1 Implement automated backups and graceful degradation
+  - Back up tenders, historical records, and documents at least every 24 hours; keep remaining subsystems running on a single subsystem failure and log failures.
+  - _Requirements: 17.1, 17.2, 17.4_
+- [x] 12.2 Add load tests for scale and latency targets
+  - Validate 10M-record storage, 2s p95 match query, and 10s match-evaluation targets.
+  - _Requirements: 15.1, 15.2, 15.3_
+
+- [x] 13. Integration tests for external boundaries
+  - Add 1-3 representative integration tests each for source-portal connectivity, email/SMS providers, encrypted object storage, and the billing provider.
+  - _Requirements: 4.1, 9.1, 12.1, 13.3_
